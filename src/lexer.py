@@ -1,6 +1,6 @@
 from typing import Callable
 
-from token import Token
+from Token import Token
 from TokenType import TokenType
 from error import LexerError
 
@@ -27,11 +27,11 @@ def collect(
         end_char: Callable[[int], bool],
         literal="") -> tuple[Token, int]:
 
-    if end_char(input_string[idx]) or idx == len(input_string):
-        return Token(token_type, literal), idx - 1
+    if idx >= len(input_string) or end_char(input_string[idx]):
+        return Token(token_type, literal), idx
 
     if char_check(input_string[idx]):
-        return collect(input_string, idx + 1, literal+input_string[idx])
+        return collect(input_string, idx+1, token_type, char_check, end_char, literal+input_string[idx])
 
     match token_type:
         case TokenType.NUMBER:
@@ -47,10 +47,10 @@ def collect(
 def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
     return collect(
         input_string,
-        0,
+        idx,
         TokenType.NAMESPACE,
         lambda x: x.isalnum(),
-        lambda x: x in [" ", ")", ";", "]"])
+        lambda x: x in [" ", ")", ";", "]", "."])
 
 
 def collect_string_literal(input_string: str, idx: int, end_quote: str) -> tuple[Token, int]:
@@ -68,10 +68,23 @@ def collect_number_token(input_string: str, idx: int) -> tuple[Token, int]:
         idx,
         TokenType.NUMBER,
         lambda x: '0' <= x <= '9' or x == '.',
-        lambda x: x in [" ", ")", ";"])
+        lambda x: x in [" ", ")", ";", "+", "=", "*", "-"])
+
+
+def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]:
+    token_info, token_idx = collect_namespace_token(input_string, idx)
+    match token_info.literal:
+        case "let":
+            return Token(TokenType.ASS, token_info.literal), token_idx
+        case "print":
+            return Token(TokenType.PRINT, token_info.literal), token_idx
+        case _:
+            return token_info, token_idx
 
 
 def lex(input_string: str, idx: int) -> tuple[Token, int]:
+    if idx >= len(input_string):
+        return Token(TokenType.EOF, "EOF"), idx
     if input_string[idx] == " ":
         idx = skip_whitespace(input_string, idx)
     ch = input_string[idx]
@@ -81,18 +94,22 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
         case "'" | "\"":
             return collect_string_literal(input_string, idx, ch)
         case ch if ch.isalnum():
-            return collect_namespace_token(input_string, idx)
+            return collect_and_classify_token(input_string, idx)
         case '(':
-            return Token(ch, TokenType.OPENPAREN), idx
+            return Token(TokenType.OPAR, ch), idx+1
         case ')':
-            return Token(ch, TokenType.CLOSEPAREN), idx
+            return Token(TokenType.CPAR, ch), idx+1
         case '*':
-            return Token(ch, TokenType.MULT), idx
+            return Token(TokenType.MULT, ch), idx+1
         case '+':
-            return Token(ch, TokenType.ADD), idx
+            return Token(TokenType.ADD, ch), idx+1
         case '-':
-            return Token(ch, TokenType.MINUS), idx
+            return Token(TokenType.SUB, ch), idx+1
         case ';':
-            return Token(ch, TokenType.DLM), idx
+            return Token(TokenType.DLM, ch), idx+1
+        case '\n':
+            return Token(TokenType.EOF, ch), idx+1
+        case '=':
+            return Token(TokenType.EQ, ch), idx+1
         case _:
             LexerError(f"Unrecognised character: {ch}")
