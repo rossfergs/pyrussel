@@ -1,7 +1,14 @@
-from ParseNode import ParseNode
-from lexer import lex
+from lexer import lex, peek
 from TokenType import TokenType
 from error import ParseError
+from pratt_parser import pp
+from ParseNode import (
+    ParseNode, ExprNode, AddNode,
+    MultNode, SubNode, DivNode,
+    IntegerNode, VariableNode, StringNode,
+    PrintNode, LetNode, StatementNode,
+    ProgramNode
+)
 
 
 """
@@ -42,7 +49,9 @@ CHARACTER
 
 def parse(input_string: str):
 
-    def parse_term(node: ParseNode, idx: int) -> tuple[bool, int]:
+    parse_expression = pp(input_string)
+
+    def parse_term(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
         current_token, current_idx = lex(input_string, idx)
         if current_token.type == TokenType.NUMBER:
             return True, current_idx
@@ -53,7 +62,7 @@ def parse(input_string: str):
 
         return False, idx
 
-    def parse_enclosed_expression(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def parse_enclosed_expression(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
         current_token, current_idx = lex(input_string, idx)
         if current_token.type != TokenType.OPAR:
             return False, idx
@@ -68,7 +77,7 @@ def parse(input_string: str):
 
         return True, current_idx
 
-    def parse_binary(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def parse_binary(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
         current_token, current_idx = lex(input_string, idx)
         if current_token.type not in [TokenType.ADD, TokenType.SUB, TokenType.MULT]:
             return False, idx
@@ -79,7 +88,8 @@ def parse(input_string: str):
 
         return True, current_idx
 
-    def parse_expression(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def _parse_expression(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
+
         parse_result, current_idx = parse_term(node, idx)
         if parse_result:
             term_idx = current_idx
@@ -101,56 +111,89 @@ def parse(input_string: str):
 
         return False, idx
 
-    def parse_assignment(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def parse_assignment(idx: int) -> tuple[StatementNode, int]:
+
         current_token, current_idx = lex(input_string, idx)
         if current_token.type != TokenType.NAMESPACE:
             return False, idx
+
+        namespace_node = VariableNode(current_token.literal)
 
         current_token, current_idx = lex(input_string, current_idx)
         if current_token.type != TokenType.EQ:
             return False, idx
 
-        parse_result, current_idx = parse_expression(node, current_idx)
-        if not parse_result:
+        expr_node, current_idx = parse_expression(current_idx)
+        if expr_node is None:
             return False, idx
 
-        return True, current_idx
+        return LetNode(namespace_node, expr_node), current_idx
 
-    def parse_statement(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def parse_print(idx: int) -> tuple[StatementNode, int]:
+        expr_node, current_idx = parse_expression(idx)
+
+        if expr_node is None:
+            ParseError("Invalid expression after PRINT")
+
+        return PrintNode(expr_node), current_idx
+
+    def parse_statement(idx: int) -> tuple[StatementNode, int]:
         current_token, current_idx = lex(input_string, idx)
         if current_token.type == TokenType.PRINT:
-            parse_result, parse_idx = parse_expression(node, current_idx)
-            if not parse_result:
-                ParseError("invalid expression after PRINT")
-            return True, parse_idx
+            return parse_print(current_idx)
 
         if current_token.type == TokenType.ASS:
-            parse_result, parse_idx = parse_assignment(node, current_idx)
-            if not parse_result:
+            expr_node, parse_idx = parse_assignment(current_idx)
+            if expr_node is None:
                 ParseError("invalid assignment after ASS")
-            return True, parse_idx
+            return expr_node, parse_idx
 
-        parse_result, current_idx = parse_expression(node, idx)
-        if parse_result:
-            return True, current_idx
+        parse_result, current_idx = parse_expression(idx)
+        if parse_result is not None:
+            return parse_result, current_idx
 
         ParseError("invalid statement inner")
 
-    def parse_program(node: ParseNode, idx: int) -> tuple[bool, int]:
+    def parse_program(idx: int, statement_list=None) -> ProgramNode:
+        if statement_list is None:
+            statement_list = []
+
         current_token, current_idx = lex(input_string, idx)
         if current_token.type == TokenType.EOF:
-            return True, current_idx
+            return ProgramNode(statement_list)
 
-        parse_result, current_idx = parse_statement(node, idx)
-        if not parse_result:
+        statement_node, current_idx = parse_statement(idx)
+        if statement_node is None:
             ParseError("invalid statement")
 
-        return parse_program(node, current_idx)
+        statement_list.append(statement_node)
 
-    start_node = ParseNode()
-    end_result, end_idx = parse_program(start_node, 0)
-    if end_result:
-        out = "Valid with grammar"
-    else:
-        out = "Invalid with grammar"
-    print(f" => {out}")
+        return parse_program(current_idx, statement_list)
+
+    def print_node(node, indent=0):
+        spacing = "    " * indent
+        if isinstance(node, ProgramNode):
+            #print(f"{spacing}{node}")
+            for statement in node.statements:
+                print_node(statement, indent + 1)
+        elif isinstance(node, LetNode):
+            print(f"{spacing}{node}")
+            print_node(node.namespace, indent + 1)
+            print_node(node.expression, indent + 1)
+        elif isinstance(node, PrintNode):
+            print(f"{spacing}{node}")
+            print_node(node.expression, indent + 1)
+        elif isinstance(node, VariableNode):
+            print(f"{spacing}{node}")
+        elif isinstance(node, IntegerNode):
+            print(f"{spacing}{node}")
+        elif isinstance(node, AddNode) or isinstance(node, SubNode) or isinstance(node, MultNode):
+            print(f"{spacing}{node}")
+            if not isinstance(node.leftNode, VariableNode) and not isinstance(node.leftNode, IntegerNode):
+                print_node(node.leftNode, indent + 1)
+            if not isinstance(node.rightNode, VariableNode) and not isinstance(node.rightNode, IntegerNode):
+                print_node(node.rightNode, indent + 1)
+
+    end_result = parse_program(0)
+    print(f" => ", end="\n")
+    print_node(end_result)

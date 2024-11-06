@@ -1,13 +1,72 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any
-
-from ParseNodeType import ParseNodeTypes
 
 
 @dataclass
 class ParseNode:
-    type: ParseNodeTypes = None
+    pass
+
+
+@dataclass
+class ProgramNode(ParseNode):
+    statements: list[StatementNode]
+
+
+@dataclass
+class StatementNode(ParseNode):
+    pass
+
+
+@dataclass
+class LetNode(StatementNode):
+    namespace: str = None,
+    expression: ExprNode = None
+
+
+@dataclass
+class PrintNode(StatementNode):
+    expression: ExprNode = None
+
+
+@dataclass
+class ExprNode(ParseNode):
+    pass
+
+
+@dataclass
+class VariableNode(ExprNode):
+    namespace: str = None
+
+
+@dataclass
+class IntegerNode(ExprNode):
     value: str = None
-    operator: str = None
-    statements: list[ParseNode] = None
+
+
+@dataclass
+class StringNode(ExprNode):
+    literal: str = None
+
+
+@dataclass
+class AddNode(ExprNode):
+    leftNode: ExprNode = None,
+    rightNode: ExprNode = None
+
+
+@dataclass
+class MultNode(ExprNode):
+    leftNode: ExprNode = None,
+    rightNode: ExprNode = None
+
+
+@dataclass
+class SubNode(ExprNode):
+    leftNode: ExprNode = None,
+    rightNode: ExprNode = None
+
+
+@dataclass
+class DivNode(ExprNode):
+    leftNode: ExprNode = None,
+    rightNode: ExprNode = None

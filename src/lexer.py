@@ -5,14 +5,6 @@ from TokenType import TokenType
 from error import LexerError
 
 
-def end_of_expression(ch: str) -> bool:
-    match ch:
-        case ' ' | '\n' | '\t' | '\r':
-            return True
-        case _:
-            return False
-
-
 def skip_whitespace(input_string: str, idx: int) -> int:
     while input_string[idx] == " ":
         idx += 1
@@ -39,7 +31,7 @@ def collect(
         case TokenType.STRING:
             LexerError("non-numeric character in string.")
         case TokenType.NAMESPACE:
-            LexerError("non-numeric character in namespace symbol.")
+            LexerError("invalid character in namespace symbol.")
         case _:
             LexerError("unexpected character in multi-character token.")
 
@@ -49,8 +41,8 @@ def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
         input_string,
         idx,
         TokenType.NAMESPACE,
-        lambda x: x.isalnum(),
-        lambda x: x in [" ", ")", ";", "]", "."])
+        lambda x: x.isalnum() or x == '_',
+        lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*"])
 
 
 def collect_string_literal(input_string: str, idx: int, end_quote: str) -> tuple[Token, int]:
@@ -113,3 +105,9 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
             return Token(TokenType.EQ, ch), idx+1
         case _:
             LexerError(f"Unrecognised character: {ch}")
+
+
+def peek(input_string: str, idx: int) -> tuple[Token, int]:
+    first_token, first_idx = lex(input_string, idx)
+    peeked_token, peeked_idx = lex(input_string, first_idx)
+    return peeked_token, peeked_idx
