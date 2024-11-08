@@ -5,9 +5,21 @@ from TokenType import TokenType
 from error import LexerError
 
 
-def skip_whitespace(input_string: str, idx: int) -> int:
+def _skip_whitespace(input_string: str, idx: int) -> int:
     while input_string[idx] == " ":
         idx += 1
+        if idx >= len(input_string):
+            return idx+1
+    return idx
+
+
+def skip_whitespace(input_string: str, idx: int) -> int:
+    if idx >= len(input_string):
+        return idx
+
+    if input_string[idx] == " ":
+        return skip_whitespace(input_string, idx+1)
+
     return idx
 
 
@@ -75,10 +87,9 @@ def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]
 
 
 def lex(input_string: str, idx: int) -> tuple[Token, int]:
+    idx = skip_whitespace(input_string, idx)
     if idx >= len(input_string):
         return Token(TokenType.EOF, "EOF"), idx
-    if input_string[idx] == " ":
-        idx = skip_whitespace(input_string, idx)
     ch = input_string[idx]
     match ch:
         case ch if '0' <= ch <= '9':

@@ -19,7 +19,7 @@ class StatementNode(ParseNode):
 
 @dataclass
 class LetNode(StatementNode):
-    namespace: str = None,
+    namespace: VariableNode = None,
     expression: ExprNode = None
 
 

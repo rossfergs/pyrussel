@@ -117,7 +117,7 @@ def parse(input_string: str):
         if current_token.type != TokenType.NAMESPACE:
             return False, idx
 
-        namespace_node = VariableNode(current_token.literal)
+        namespace_node = current_token.literal
 
         current_token, current_idx = lex(input_string, current_idx)
         if current_token.type != TokenType.EQ:
@@ -189,11 +189,7 @@ def parse(input_string: str):
             print(f"{spacing}{node}")
         elif isinstance(node, AddNode) or isinstance(node, SubNode) or isinstance(node, MultNode):
             print(f"{spacing}{node}")
-            if not isinstance(node.leftNode, VariableNode) and not isinstance(node.leftNode, IntegerNode):
-                print_node(node.leftNode, indent + 1)
-            if not isinstance(node.rightNode, VariableNode) and not isinstance(node.rightNode, IntegerNode):
-                print_node(node.rightNode, indent + 1)
-
+            print_node(node.leftNode, indent + 1)
+            print_node(node.rightNode, indent + 1)
     end_result = parse_program(0)
-    print(f" => ", end="\n")
-    print_node(end_result)
+    return end_result

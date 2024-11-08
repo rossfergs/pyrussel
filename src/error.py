@@ -6,7 +6,7 @@ class Error:
         exit(0)
 
     def show_error_message(self, message):
-        print(message)
+        print(f"Error: {message}")
 
 
 class ParseError(Error):
@@ -23,3 +23,11 @@ class LexerError(Error):
 
     def show_error_message(self, message):
         print(f"Error in lexing: {message}")
+
+
+class InterpreterError(Error):
+    def __init__(self, message):
+        super().__init__(message)
+
+    def show_error_message(self, message):
+        print(f"Error in interpreting: {message}")
