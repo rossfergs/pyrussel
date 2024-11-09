@@ -7,7 +7,8 @@ from error import Error, ParseError
 from ParseNode import (
     ParseNode, ExprNode, AddNode,
     MultNode, SubNode, DivNode,
-    IntegerNode, VariableNode, StringNode
+    IntegerNode, FloatNode, VariableNode,
+    StringNode
 )
 
 
@@ -17,7 +18,11 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
 
         def nud(t: Token, idx: int) -> tuple[ExprNode, int]:
             match t.type:
-                case TokenType.NUMBER:
+                case TokenType.STRING:
+                    return StringNode(t.literal), idx+1
+                case TokenType.FLOAT:
+                    return FloatNode(t.literal), idx
+                case TokenType.INTEGER:
                     return IntegerNode(t.literal), idx
                 case TokenType.NAMESPACE:
                     return VariableNode(t.literal), idx

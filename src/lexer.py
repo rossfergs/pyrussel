@@ -5,14 +5,6 @@ from TokenType import TokenType
 from error import LexerError
 
 
-def _skip_whitespace(input_string: str, idx: int) -> int:
-    while input_string[idx] == " ":
-        idx += 1
-        if idx >= len(input_string):
-            return idx+1
-    return idx
-
-
 def skip_whitespace(input_string: str, idx: int) -> int:
     if idx >= len(input_string):
         return idx
@@ -67,12 +59,17 @@ def collect_string_literal(input_string: str, idx: int, end_quote: str) -> tuple
 
 
 def collect_number_token(input_string: str, idx: int) -> tuple[Token, int]:
-    return collect(
+    number, current_idx = collect(
         input_string,
         idx,
         TokenType.NUMBER,
         lambda x: '0' <= x <= '9' or x == '.',
         lambda x: x in [" ", ")", ";", "+", "=", "*", "-"])
+
+    if '.' in number.literal:
+        return Token(TokenType.FLOAT, number.literal), current_idx
+
+    return Token(TokenType.INTEGER, number.literal), current_idx
 
 
 def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]:
@@ -95,7 +92,7 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
         case ch if '0' <= ch <= '9':
             return collect_number_token(input_string, idx)
         case "'" | "\"":
-            return collect_string_literal(input_string, idx, ch)
+            return collect_string_literal(input_string, idx+1, ch)
         case ch if ch.isalnum():
             return collect_and_classify_token(input_string, idx)
         case '(':

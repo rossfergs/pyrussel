@@ -9,5 +9,4 @@ def main():
         tree = parse(user_input)
         interpret(tree)
 
-
 main()

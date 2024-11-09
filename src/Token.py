@@ -6,4 +6,3 @@ from TokenType import TokenType
 class Token:
     type: TokenType
     literal: str
-    line: int = -1

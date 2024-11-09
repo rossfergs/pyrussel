@@ -16,4 +16,6 @@ class TokenType(Enum):
     PRINT = enum.auto()
     NAMESPACE = enum.auto()
     STRING = enum.auto()
+    INTEGER = enum.auto()
+    FLOAT = enum.auto()
     NUMBER = enum.auto()

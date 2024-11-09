@@ -16,6 +16,9 @@ RSL CF-GRAMMAR RULES
 
 PROGRAM 
     := STATEMENT PROGRAM | EOF
+    
+BLOCK
+    := STATEMENT BLOCK | EXPRESSION
 
 STATEMENT 
     := print EXPRESSION
@@ -50,66 +53,6 @@ CHARACTER
 def parse(input_string: str):
 
     parse_expression = pp(input_string)
-
-    def parse_term(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
-        current_token, current_idx = lex(input_string, idx)
-        if current_token.type == TokenType.NUMBER:
-            return True, current_idx
-
-        if current_token.type == TokenType.STRING:
-            # Add another one to index to account for " or '
-            return True, current_idx+1
-
-        return False, idx
-
-    def parse_enclosed_expression(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
-        current_token, current_idx = lex(input_string, idx)
-        if current_token.type != TokenType.OPAR:
-            return False, idx
-
-        parse_result, current_idx = parse_expression(node, current_idx)
-        if not parse_result:
-            return False, idx
-
-        current_token, current_idx = lex(input_string, current_idx)
-        if current_token.type != TokenType.CPAR:
-            return False, idx
-
-        return True, current_idx
-
-    def parse_binary(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
-        current_token, current_idx = lex(input_string, idx)
-        if current_token.type not in [TokenType.ADD, TokenType.SUB, TokenType.MULT]:
-            return False, idx
-
-        parse_result, current_idx = parse_expression(node, current_idx)
-        if not parse_result:
-            return False, idx
-
-        return True, current_idx
-
-    def _parse_expression(node: ParseNode, idx: int) -> tuple[ExprNode, int]:
-
-        parse_result, current_idx = parse_term(node, idx)
-        if parse_result:
-            term_idx = current_idx
-            parse_result, current_idx = parse_binary(node, current_idx)
-
-            if not parse_result:
-                return True, term_idx
-
-            return True, current_idx
-
-        parse_result, current_idx = parse_enclosed_expression(node, idx)
-        if parse_result:
-
-            return True, current_idx
-
-        current_token, current_idx = lex(input_string, idx)
-        if current_token.type == TokenType.NAMESPACE:
-            return True, current_idx
-
-        return False, idx
 
     def parse_assignment(idx: int) -> tuple[StatementNode, int]:
 
@@ -173,7 +116,6 @@ def parse(input_string: str):
     def print_node(node, indent=0):
         spacing = "    " * indent
         if isinstance(node, ProgramNode):
-            #print(f"{spacing}{node}")
             for statement in node.statements:
                 print_node(statement, indent + 1)
         elif isinstance(node, LetNode):

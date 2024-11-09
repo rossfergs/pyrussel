@@ -44,29 +44,34 @@ class IntegerNode(ExprNode):
 
 
 @dataclass
+class FloatNode(ExprNode):
+    value: str = None
+
+
+@dataclass
 class StringNode(ExprNode):
-    literal: str = None
+    value: str = None
 
 
 @dataclass
 class AddNode(ExprNode):
-    leftNode: ExprNode = None,
-    rightNode: ExprNode = None
+    left: ExprNode = None,
+    right: ExprNode = None
 
 
 @dataclass
 class MultNode(ExprNode):
-    leftNode: ExprNode = None,
-    rightNode: ExprNode = None
+    left: ExprNode = None,
+    right: ExprNode = None
 
 
 @dataclass
 class SubNode(ExprNode):
-    leftNode: ExprNode = None,
-    rightNode: ExprNode = None
+    left: ExprNode = None,
+    right: ExprNode = None
 
 
 @dataclass
 class DivNode(ExprNode):
-    leftNode: ExprNode = None,
-    rightNode: ExprNode = None
+    left: ExprNode = None,
+    right: ExprNode = None

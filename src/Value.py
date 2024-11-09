@@ -1,24 +1,24 @@
 
 
-class Variable:
+class Value:
     def __init__(self):
-        variable_type = "Non-Specific Variable"
-        variable_value = "N/A"
+        self.var_type = "Non-Specific Variable"
+        self.value = "N/A"
 
 
-class IntVariable(Variable):
+class IntValue(Value):
     def __init__(self, var_value):
         self.var_type = "Int"
         self.value = int(var_value)
 
 
-class StringVariable(Variable):
+class StringValue(Value):
     def __init__(self, var_value):
         self.var_type = "Str"
-        self.value = var_value
+        self.value = str(var_value)
 
 
-class FloatVariable(Variable):
+class FloatValue(Value):
     def __init__(self, var_value):
         self.var_type = "Float"
         self.value = float(var_value)

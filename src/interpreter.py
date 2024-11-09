@@ -1,45 +1,92 @@
-from error import Error
+from typing import Callable
+
+from error import Error, InterpreterError
 from ParseNode import (
     ParseNode, ExprNode, AddNode,
     MultNode, SubNode, DivNode,
-    IntegerNode, VariableNode, StringNode,
+    IntegerNode, FloatNode, StringNode,
     PrintNode, LetNode, StatementNode,
-    ProgramNode
+    ProgramNode, VariableNode
 )
 from Scope import Scope
-from Variable import IntVariable
+from Value import Value, IntValue, StringValue, FloatValue
 
 
-# TODO: Change this to work with non int types
-# Figure out how to return values and such
-def interpret_expression(node: ExprNode, scope: Scope) -> int:
+def get_variable_value(name: str, scope: Scope) -> Value:
+    if name not in scope.current_scope:
+        if scope.outer_scope is None:
+            InterpreterError(f"Unknown variable '{name}'")
+
+        return get_variable_value(name, scope.outer_scope)
+
+    return scope.current_scope[name]
+
+
+def interpret_expression(node: ExprNode, scope: Scope) -> Value:
+
+    def find_result_type(left_node: Value, right_node: Value) -> (str, Value, Value):
+        match (left_node.var_type, right_node.var_type):
+            case ("Int", "Int") | ("Float", "Float") | ("Str", "Str"):
+                return left_node.var_type, left_node, right_node
+            case ("Str", _) | (_, "Str"):
+                InterpreterError(f"Type mismatch: {left_node.var_type} and {right_node.var_type}")
+                return "Str", StringValue(left_node.value), StringValue(right_node.value)
+            case ("Float", _) | (_, "Float"):
+                return "Float", FloatValue(left_node.value), FloatValue(right_node.value)
+            case ("Bool", _) | (_, "Bool"):
+                InterpreterError("Cannot apply operations on boolean type")
+            case _:
+                Error("unknown result type from operationl")
+
+    def apply_binary_operator(
+            left_node: ExprNode,
+            right_node: ExprNode,
+            operation: Callable[[Value, Value], Value]) -> Value:
+
+        left_value = interpret_expression(left_node, scope)
+        right_value = interpret_expression(right_node, scope)
+
+        t, lv, rv = find_result_type(left_value, right_value)
+        match t:
+            case "Int":
+                return IntValue(operation(lv.value, rv.value))
+            case "Float":
+                return FloatValue(operation(lv.value, rv.value))
+            case "Str":
+                return StringValue(operation(lv.value, rv.value))
 
     if isinstance(node, IntegerNode):
-        return int(node.value)
+        return IntValue(int(node.value))
+
+    if isinstance(node, StringNode):
+        return StringValue(node.value)
+
+    if isinstance(node, FloatNode):
+        return FloatValue(node.value)
 
     if isinstance(node, VariableNode):
-        return scope.current_scope[node.namespace].value
+        return get_variable_value(node.namespace, scope)
 
     match node:
         case AddNode():
-            return interpret_expression(node.leftNode, scope) + interpret_expression(node.rightNode, scope)
+            return apply_binary_operator(node.left, node.right, lambda x, y: x + y)
         case MultNode():
-            return interpret_expression(node.leftNode, scope) * interpret_expression(node.rightNode, scope)
+            return apply_binary_operator(node.left, node.right, lambda x, y: x * y)
         case SubNode():
-            return interpret_expression(node.leftNode, scope) - interpret_expression(node.rightNode, scope)
+            return apply_binary_operator(node.left, node.right, lambda x, y: x - y)
         case _:
             Error("Unknown expression type")
 
 
 def interpret_assignment(node: LetNode, scope: Scope) -> Scope:
     evaluated_expression = interpret_expression(node.expression, scope)
-    scope.current_scope[node.namespace] = IntVariable(evaluated_expression)
+    scope.current_scope[node.namespace] = evaluated_expression
     return scope
 
 
 def interpret_print(node: PrintNode, scope: Scope) -> None:
     evaluated_expression = interpret_expression(node.expression, scope)
-    print(evaluated_expression)
+    print(evaluated_expression.value)
 
 
 def interpret_statement(node: StatementNode, scope: Scope) -> Scope:
@@ -52,7 +99,8 @@ def interpret_statement(node: StatementNode, scope: Scope) -> Scope:
         return scope
 
     if isinstance(node, ExprNode):
-        print(interpret_expression(node, scope))
+        v = interpret_expression(node, scope)
+        print(v.value)
         return scope
 
     Error("Not yet implemented statement type")
