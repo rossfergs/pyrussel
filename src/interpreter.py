@@ -1,5 +1,6 @@
 from typing import Callable
 
+from parser import parse
 from error import Error, InterpreterError
 from ParseNode import (
     ParseNode, ExprNode, AddNode,
@@ -36,7 +37,7 @@ def interpret_expression(node: ExprNode, scope: Scope) -> Value:
             case ("Bool", _) | (_, "Bool"):
                 InterpreterError("Cannot apply operations on boolean type")
             case _:
-                Error("unknown result type from operationl")
+                Error("unknown result type from operation")
 
     def apply_binary_operator(
             left_node: ExprNode,
@@ -131,8 +132,9 @@ def interpret_program(node: ProgramNode) -> None:
     interpret_statements(node.statements)
 
 
-def interpret(start_node: ParseNode) -> None:
-    if not isinstance(start_node, ProgramNode):
+def interpret(input_string: str) -> None:
+    tree = parse(input_string)
+    if not isinstance(tree, ProgramNode):
         Error("Start node must be of type ProgramNode")
 
-    interpret_program(start_node)
+    interpret_program(tree)
