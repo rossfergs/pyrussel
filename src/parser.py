@@ -1,3 +1,5 @@
+from _ast import Expression
+
 from lexer import lex, peek
 from TokenType import TokenType
 from error import ParseError
@@ -7,7 +9,7 @@ from ParseNode import (
     MultNode, SubNode, DivNode,
     IntegerNode, VariableNode, StringNode,
     PrintNode, LetNode, StatementNode,
-    ProgramNode
+    ProgramNode, BlockNode
 )
 
 
@@ -66,7 +68,7 @@ def parse(input_string: str):
         if current_token.type != TokenType.EQ:
             return False, idx
 
-        expr_node, current_idx = parse_expression(current_idx)
+        expr_node, current_idx = parse_block(current_idx)
         if expr_node is None:
             return False, idx
 
@@ -96,6 +98,17 @@ def parse(input_string: str):
             return parse_result, current_idx
 
         ParseError("invalid statement inner")
+
+    def parse_block(idx: int, statement_list: list[StatementNode] = None) -> tuple[BlockNode, int]:
+        if statement_list is None:
+            statement_list = []
+
+        statement, current_idx = parse_statement(idx)
+        if isinstance(statement, ExprNode):
+            return BlockNode(statement_list, statement), current_idx
+
+        statement_list.append(statement)
+        return parse_block(current_idx, statement_list)
 
     def parse_program(idx: int, statement_list=None) -> ProgramNode:
         if statement_list is None:

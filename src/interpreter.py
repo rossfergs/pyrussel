@@ -6,7 +6,7 @@ from ParseNode import (
     MultNode, SubNode, DivNode,
     IntegerNode, FloatNode, StringNode,
     PrintNode, LetNode, StatementNode,
-    ProgramNode, VariableNode
+    ProgramNode, VariableNode, BlockNode
 )
 from Scope import Scope
 from Value import Value, IntValue, StringValue, FloatValue
@@ -78,8 +78,17 @@ def interpret_expression(node: ExprNode, scope: Scope) -> Value:
             Error("Unknown expression type")
 
 
+def interpret_block(node: BlockNode, scope: Scope, statement_idx: int = 0) -> tuple[Value, Scope]:
+    if statement_idx >= len(node.statements):
+        return interpret_expression(node.expression, scope), scope.outer_scope
+
+    scope = interpret_statement(node.statements[statement_idx], scope)
+
+    return interpret_block(node, scope, statement_idx + 1)
+
+
 def interpret_assignment(node: LetNode, scope: Scope) -> Scope:
-    evaluated_expression = interpret_expression(node.expression, scope)
+    evaluated_expression, scope = interpret_block(node.expression, scope)
     scope.current_scope[node.namespace] = evaluated_expression
     return scope
 
@@ -91,7 +100,9 @@ def interpret_print(node: PrintNode, scope: Scope) -> None:
 
 def interpret_statement(node: StatementNode, scope: Scope) -> Scope:
     if isinstance(node, LetNode):
-        new_scope = interpret_assignment(node, scope)
+        inner_scope = Scope()
+        inner_scope.outer_scope = scope
+        new_scope = interpret_assignment(node, inner_scope)
         return new_scope
 
     if isinstance(node, PrintNode):

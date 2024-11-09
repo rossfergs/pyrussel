@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from _ast import Expression
 from dataclasses import dataclass
 
 
@@ -10,6 +12,12 @@ class ParseNode:
 @dataclass
 class ProgramNode(ParseNode):
     statements: list[StatementNode]
+
+
+@dataclass
+class BlockNode(ParseNode):
+    statements: list[StatementNode]
+    expression: ExprNode
 
 
 @dataclass
