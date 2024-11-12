@@ -1,6 +1,4 @@
-from _ast import Expression
-
-from lexer import lex, peek
+from lexer import lex
 from TokenType import TokenType
 from error import ParseError
 from pratt_parser import pp
@@ -20,17 +18,24 @@ PROGRAM
     := STATEMENT PROGRAM | EOF
     
 BLOCK
-    := STATEMENT BLOCK | EXPRESSION
+    := STATEMENT/ BLOCK | EXPRESSION
 
 STATEMENT 
     := print EXPRESSION
-    := let namespace = EXPRESSION
+    := let namespace PARAMETERS = EXPRESSION
     := EXPRESSION
+    
+PARAMETERS
+    := namespace PARAMETERS | None
 
 EXPRESSION
+    := function_name ARGUMENTS
     := TERM OPERATOR EXPRESSION
     := TERM
     := ( EXPRESSION )
+    
+ARGUMENTS
+    := EXPRESSION ARGUMENTS | None
     
 TERM
     := STRING
@@ -56,23 +61,34 @@ def parse(input_string: str):
 
     parse_expression = pp(input_string)
 
-    def parse_assignment(idx: int) -> tuple[StatementNode, int]:
+    def parse_parameters(idx: int, params: list[str] = None) -> list[str]:
+        if params is None:
+            params = []
 
+        current_token, current_idx = lex(input_string, idx)
+        if current_token.type == TokenType.NAMESPACE:
+            params.append(current_token.literal)
+            return parse_parameters(current_idx, params)
+
+        if current_token.type != TokenType.EQ:
+            ParseError(f"Invalid input parameter: '{current_token.literal}'")
+
+        return params, current_idx
+
+    def parse_assignment(idx: int) -> tuple[StatementNode, int]:
         current_token, current_idx = lex(input_string, idx)
         if current_token.type != TokenType.NAMESPACE:
             return False, idx
 
-        namespace_node = current_token.literal
+        namespace = current_token.literal
 
-        current_token, current_idx = lex(input_string, current_idx)
-        if current_token.type != TokenType.EQ:
+        input_parameters, current_idx = parse_parameters(current_idx)
+
+        block_node, current_idx = parse_block(current_idx, input_parameters)
+        if block_node is None:
             return False, idx
 
-        expr_node, current_idx = parse_block(current_idx)
-        if expr_node is None:
-            return False, idx
-
-        return LetNode(namespace_node, expr_node), current_idx
+        return LetNode(namespace, block_node), current_idx
 
     def parse_print(idx: int) -> tuple[StatementNode, int]:
         expr_node, current_idx = parse_expression(idx)
@@ -99,16 +115,19 @@ def parse(input_string: str):
 
         ParseError("invalid statement inner")
 
-    def parse_block(idx: int, statement_list: list[StatementNode] = None) -> tuple[BlockNode, int]:
+    def parse_block(idx: int,
+                    input_params: list[str],
+                    statement_list: list[StatementNode] = None) -> tuple[BlockNode, int]:
+
         if statement_list is None:
             statement_list = []
 
         statement, current_idx = parse_statement(idx)
         if isinstance(statement, ExprNode):
-            return BlockNode(statement_list, statement), current_idx
+            return BlockNode(input_params, statement_list, statement), current_idx
 
         statement_list.append(statement)
-        return parse_block(current_idx, statement_list)
+        return parse_block(current_idx, input_params, statement_list)
 
     def parse_program(idx: int, statement_list=None) -> ProgramNode:
         if statement_list is None:
@@ -134,7 +153,7 @@ def parse(input_string: str):
         elif isinstance(node, LetNode):
             print(f"{spacing}{node}")
             print_node(node.namespace, indent + 1)
-            print_node(node.expression, indent + 1)
+            print_node(node.block, indent + 1)
         elif isinstance(node, PrintNode):
             print(f"{spacing}{node}")
             print_node(node.expression, indent + 1)
@@ -144,7 +163,8 @@ def parse(input_string: str):
             print(f"{spacing}{node}")
         elif isinstance(node, AddNode) or isinstance(node, SubNode) or isinstance(node, MultNode):
             print(f"{spacing}{node}")
-            print_node(node.leftNode, indent + 1)
-            print_node(node.rightNode, indent + 1)
+            print_node(node.left, indent + 1)
+            print_node(node.right, indent + 1)
+
     end_result = parse_program(0)
     return end_result

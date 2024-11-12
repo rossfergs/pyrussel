@@ -2,7 +2,7 @@ from typing import Callable
 
 from Token import Token
 from TokenType import TokenType
-from lexer import lex, peek
+from lexer import lex
 from error import Error, ParseError
 from ParseNode import (
     ParseNode, ExprNode, AddNode,
@@ -13,19 +13,42 @@ from ParseNode import (
 
 
 def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
-
     def parse_expression(start_idx: int) -> tuple[ExprNode, int]:
+
+        def collect_parameters(idx: int, params: list[ExprNode] = None) -> tuple[list[ExprNode], int]:
+            if params is None:
+                params = []
+
+            next_token, next_idx = lex(input_string, idx)
+            if (next_token.type not in
+                    [TokenType.NAMESPACE,
+                     TokenType.STRING,
+                     TokenType.FLOAT,
+                     TokenType.OPAR,
+                     TokenType.INTEGER]):
+                return params, idx
+
+            if next_token.type == TokenType.NAMESPACE:
+                params.append(VariableNode(next_token.literal, []))
+                new_params = params
+                return collect_parameters(next_idx, new_params)
+
+            next_param, next_idx = nud(next_token, next_idx)
+            params.append(next_param)
+            new_params = params
+            return collect_parameters(next_idx, new_params)
 
         def nud(t: Token, idx: int) -> tuple[ExprNode, int]:
             match t.type:
                 case TokenType.STRING:
-                    return StringNode(t.literal), idx+1
+                    return StringNode(t.literal), idx + 1
                 case TokenType.FLOAT:
-                    return FloatNode(t.literal), idx
+                    return FloatNode(float(t.literal)), idx
                 case TokenType.INTEGER:
-                    return IntegerNode(t.literal), idx
+                    return IntegerNode(int(t.literal)), idx
                 case TokenType.NAMESPACE:
-                    return VariableNode(t.literal), idx
+                    params, next_idx = collect_parameters(idx)
+                    return VariableNode(t.literal, params), next_idx
                 case TokenType.OPAR:
                     paren_result, paren_idx = parse(0, idx)
                     next_token, next_idx = lex(input_string, paren_idx)
@@ -34,7 +57,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
 
                     return paren_result, next_idx
                 case _:
-                    ParseError("Invalid Token in expression")
+                    ParseError(f"Invalid Token '{t.literal}' in expression")
 
         def led(left_node: ExprNode, operator: Token, idx: int) -> ExprNode:
             match operator.type:
@@ -62,7 +85,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                 case _:
                     return 0
 
-        def collect_expression(left_node: ExprNode, lbp: int,  idx: int) -> tuple[ExprNode, int]:
+        def collect_expression(left_node: ExprNode, lbp: int, idx: int) -> tuple[ExprNode, int]:
             current_token, current_idx = lex(input_string, idx)
             if get_left_binding_power(current_token) > lbp:
                 expr, current_idx = led(left_node, current_token, current_idx)

@@ -46,7 +46,7 @@ def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
         idx,
         TokenType.NAMESPACE,
         lambda x: x.isalnum() or x == '_',
-        lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*"])
+        lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*", "="])
 
 
 def collect_string_literal(input_string: str, idx: int, end_quote: str) -> tuple[Token, int]:
@@ -113,9 +113,3 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
             return Token(TokenType.EQ, ch), idx+1
         case _:
             LexerError(f"Unrecognised character: {ch}")
-
-
-def peek(input_string: str, idx: int) -> tuple[Token, int]:
-    first_token, first_idx = lex(input_string, idx)
-    peeked_token, peeked_idx = lex(input_string, first_idx)
-    return peeked_token, peeked_idx

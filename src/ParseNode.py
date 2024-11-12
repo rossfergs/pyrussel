@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from _ast import Expression
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -16,8 +15,9 @@ class ProgramNode(ParseNode):
 
 @dataclass
 class BlockNode(ParseNode):
-    statements: list[StatementNode]
-    expression: ExprNode
+    parameters: list[str] = field(default_factory=list)
+    statements: list[StatementNode] = field(default_factory=list)
+    expression: ExprNode = None
 
 
 @dataclass
@@ -28,7 +28,7 @@ class StatementNode(ParseNode):
 @dataclass
 class LetNode(StatementNode):
     namespace: VariableNode = None,
-    expression: ExprNode = None
+    block: BlockNode = None
 
 
 @dataclass
@@ -44,16 +44,17 @@ class ExprNode(ParseNode):
 @dataclass
 class VariableNode(ExprNode):
     namespace: str = None
+    parameters: list[ExprNode] = None
 
 
 @dataclass
 class IntegerNode(ExprNode):
-    value: str = None
+    value: int = None
 
 
 @dataclass
 class FloatNode(ExprNode):
-    value: str = None
+    value: float = None
 
 
 @dataclass
