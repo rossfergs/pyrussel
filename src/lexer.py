@@ -79,6 +79,8 @@ def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]
             return Token(TokenType.ASS, token_info.literal), token_idx
         case "print":
             return Token(TokenType.PRINT, token_info.literal), token_idx
+        case "in":
+            return Token(TokenType.DELIM, token_info.literal), token_idx
         case _:
             return token_info, token_idx
 
@@ -106,7 +108,7 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
         case '-':
             return Token(TokenType.SUB, ch), idx+1
         case ';':
-            return Token(TokenType.DLM, ch), idx+1
+            return Token(TokenType.DELIM, ch), idx+1
         case '\n':
             return Token(TokenType.EOF, ch), idx+1
         case '=':

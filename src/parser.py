@@ -18,11 +18,11 @@ PROGRAM
     := STATEMENT PROGRAM | EOF
     
 BLOCK
-    := STATEMENT/ BLOCK | EXPRESSION ;
+    := STATEMENT BLOCK | EXPRESSION
 
 STATEMENT 
-    := print EXPRESSION
-    := let namespace PARAMETERS = BLOCK
+    := print EXPRESSION;
+    := let namespace PARAMETERS = BLOCK;
     := EXPRESSION
     
 PARAMETERS
@@ -61,6 +61,14 @@ def parse(input_string: str):
 
     parse_expression = pp(input_string)
 
+    def check_delimiter(idx: int) -> tuple[bool, int]:
+        delim_token, delim_idx = lex(input_string, idx)
+
+        if delim_token.type != TokenType.DELIM:
+            return False, idx
+
+        return True, delim_idx
+
     def parse_parameters(idx: int, params: list[str] = None) -> list[str]:
         if params is None:
             params = []
@@ -88,15 +96,23 @@ def parse(input_string: str):
         if block_node is None:
             return False, idx
 
-        return LetNode(namespace, block_node), current_idx
+        delim_present, end_idx = check_delimiter(current_idx)
+        if not delim_present:
+            ParseError("Delimiter required after let")
+
+        return LetNode(namespace, block_node), end_idx
 
     def parse_print(idx: int) -> tuple[StatementNode, int]:
         expr_node, current_idx = parse_expression(idx)
 
         if expr_node is None:
-            ParseError("Invalid expression after PRINT")
+            ParseError("Invalid expression after print")
 
-        return PrintNode(expr_node), current_idx
+        delim_present, end_idx = check_delimiter(current_idx)
+        if not delim_present:
+            ParseError("Delimiter required after print")
+
+        return PrintNode(expr_node), end_idx
 
     def parse_statement(idx: int) -> tuple[StatementNode, int]:
         current_token, current_idx = lex(input_string, idx)
@@ -107,7 +123,10 @@ def parse(input_string: str):
             expr_node, parse_idx = parse_assignment(current_idx)
             if expr_node is None:
                 ParseError("invalid assignment after ASS")
+
             return expr_node, parse_idx
+
+        # ParseError(f"Unrecognised Statement '{current_token.literal}'")
 
         parse_result, current_idx = parse_expression(idx)
         if parse_result is not None:

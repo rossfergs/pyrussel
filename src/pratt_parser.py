@@ -80,7 +80,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                     return 2
                 case TokenType.MULT:
                     return 3
-                case TokenType.EOF:
+                case TokenType.EOF | TokenType.DELIM:
                     return -1
                 case _:
                     return 0
