@@ -30,8 +30,6 @@ def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
             idx: int = 0,
             sd: dict[str, ExprNode | BlockNode] = None) -> dict[str, ExprNode | BlockNode]:
 
-        print(pl)
-
         if sd is None:
             sd = {}
 
@@ -61,7 +59,8 @@ def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
         sd[pl[idx]] = block
 
         return set_params(f_name, pl, al, idx + 1, sd)
-    print(scope)
+    print(get_from_scope(var.namespace, scope).parameters)
+    print(scope.current_scope[var.namespace].parameters)
     new_scope = Scope()
     new_scope.outer_scope = scope.current_scope
     new_scope.current_scope = set_params(var.namespace, get_from_scope(var.namespace, scope).parameters, var.parameters)

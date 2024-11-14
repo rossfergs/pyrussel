@@ -11,7 +11,7 @@ class TokenType(Enum):
     MULT = enum.auto()
     SUB = enum.auto()
     EQ = enum.auto()
-    DLM = enum.auto()
+    DELIM = enum.auto()
     EOF = enum.auto()
     PRINT = enum.auto()
     NAMESPACE = enum.auto()
