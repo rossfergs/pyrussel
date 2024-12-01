@@ -17,7 +17,6 @@ def get_from_scope(name: str, scope: Scope) -> ExprNode | BlockNode:
         if scope.outer_scope is None:
             InterpreterError(f"Unknown variable '{name}'")
         return get_from_scope(name, scope.outer_scope)
-
     return scope.current_scope[name]
 
 
@@ -41,7 +40,7 @@ def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
 
         if not isinstance(al[idx], VariableNode):
             new_block = BlockNode()
-            new_block.expression = al[idx]
+            new_block.expression = interpret_expression(al[idx], scope)
             sd[pl[idx]] = new_block
             return set_params(f_name, pl, al, idx + 1, sd)
 
@@ -59,13 +58,12 @@ def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
         sd[pl[idx]] = block
 
         return set_params(f_name, pl, al, idx + 1, sd)
-    print(get_from_scope(var.namespace, scope).parameters)
-    print(scope.current_scope[var.namespace].parameters)
-    new_scope = Scope()
-    new_scope.outer_scope = scope.current_scope
-    new_scope.current_scope = set_params(var.namespace, get_from_scope(var.namespace, scope).parameters, var.parameters)
 
-    result, result_scope = interpret_block(get_from_scope(var.namespace, scope), new_scope)
+    func = get_from_scope(var.namespace, scope)
+    new_scope = Scope()
+    new_scope.outer_scope = scope
+    new_scope.current_scope = set_params(var.namespace, func.parameters, var.parameters)
+    result, result_scope = interpret_block(func, new_scope)
     return result
 
 
@@ -82,29 +80,29 @@ def interpret_expression(node: ExprNode, scope: Scope) -> ExprNode:
             case _:
                 InterpreterError(f"Invalid Expression to get type from {n}")
 
-    def find_result_type(l: ExprNode, r: ExprNode) -> tuple[str, ExprNode, ExprNode]:
-        lt = get_type(l)
-        rt = get_type(r)
+    def find_result_type(left: ExprNode, right: ExprNode) -> tuple[str, ExprNode, ExprNode]:
+        lt = get_type(left)
+        rt = get_type(right)
         match (lt, rt):
             case ("Int", "Int") | ("Float", "Float") | ("Str", "Str"):
-                return lt, l, r
+                return lt, left, right
             case ("Str", _) | (_, "Str"):
                 InterpreterError(f"Type mismatch: {lt} and {rt}")
-                return "Str", StringNode(l.value), StringNode(r.value)
+                return "Str", StringNode(left.value), StringNode(right.value)
             case ("Float", _) | (_, "Float"):
-                return "Float", FloatNode(l.value), FloatNode(r.value)
+                return "Float", FloatNode(left.value), FloatNode(right.value)
             case ("Bool", _) | (_, "Bool"):
                 InterpreterError("Cannot apply operations on boolean type")
             case _:
                 Error("unknown result type from operation")
 
     def apply_binary_operator(
-            left_node: ExprNode,
-            right_node: ExprNode,
+            left: ExprNode,
+            right: ExprNode,
             operation: Callable[[ExprNode, ExprNode], ExprNode]) -> ExprNode:
 
-        left_value = interpret_expression(left_node, scope)
-        right_value = interpret_expression(right_node, scope)
+        left_value = interpret_expression(left, scope)
+        right_value = interpret_expression(right, scope)
         t, lv, rv = find_result_type(left_value, right_value)
         match t:
             case "Int":
@@ -132,6 +130,10 @@ def interpret_expression(node: ExprNode, scope: Scope) -> ExprNode:
 
 def interpret_block(node: BlockNode, scope: Scope, statement_idx: int = 0) -> tuple[ExprNode, Scope]:
     if statement_idx >= len(node.statements):
+
+        if isinstance(node.expression, BlockNode) and node.parameters and node.expression.parameters:
+            return node.expression, scope.outer_scope
+
         return interpret_expression(node.expression, scope), scope.outer_scope
 
     scope = interpret_statement(node.statements[statement_idx], scope)
@@ -140,8 +142,8 @@ def interpret_block(node: BlockNode, scope: Scope, statement_idx: int = 0) -> tu
 
 
 def interpret_assignment(node: LetNode, scope: Scope) -> Scope:
-    evaluated_expression, scope = interpret_block(node.expression, scope)
-    scope.current_scope[node.namespace] = evaluated_expression
+    new_block, scope = interpret_block(node.expression, scope)
+    scope.current_scope[node.namespace] = new_block
     return scope
 
 

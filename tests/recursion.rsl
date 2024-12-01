@@ -1,0 +1,5 @@
+let rec n inc =
+    print n;
+    rec (n + inc) inc;
+
+rec 0 1

@@ -29,7 +29,7 @@ PARAMETERS
     := namespace PARAMETERS | None
 
 EXPRESSION
-    := function_name ARGUMENTS
+    := namespace ARGUMENTS
     := TERM OPERATOR EXPRESSION
     := TERM
     := ( EXPRESSION )
@@ -186,4 +186,5 @@ def parse(input_string: str):
             print_node(node.right, indent + 1)
 
     end_result = parse_program(0)
+    # print_node(end_result)
     return end_result

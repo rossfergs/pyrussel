@@ -5,6 +5,16 @@ from interpreter import interpret
 from error import Error
 
 
+def show_version():
+    print(
+        """  LAMBDRADOR
+    \\ _ /_
+    /\\-/\\
+    V 0.1"""
+    )
+    exit(0)
+
+
 def main():
     ap = argparse.ArgumentParser("Russel Interpreter \n rsli")
     ap.add_argument("filename", nargs="?", type=str, help="File to interpret (.rsl file)")

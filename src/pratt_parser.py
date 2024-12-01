@@ -11,8 +11,14 @@ from ParseNode import (
     StringNode
 )
 
+#  LAMBDRADOR
+#    \___/_
+#    /\-/\
+#    V 0.1
+
 
 def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
+
     def parse_expression(start_idx: int) -> tuple[ExprNode, int]:
 
         def collect_parameters(idx: int, params: list[ExprNode] = None) -> tuple[list[ExprNode], int]:
@@ -20,6 +26,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                 params = []
 
             next_token, next_idx = lex(input_string, idx)
+
             if (next_token.type not in
                     [TokenType.NAMESPACE,
                      TokenType.STRING,
@@ -54,6 +61,10 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                     next_token, next_idx = lex(input_string, paren_idx)
                     if next_token.type != TokenType.CPAR:
                         ParseError("Unclosed parenthesis")
+
+                    # if isinstance(paren_result, VariableNode):
+                    #     params, next_idx = collect_parameters(next_idx)
+                    #     paren_result.parameters += params
 
                     return paren_result, next_idx
                 case _:

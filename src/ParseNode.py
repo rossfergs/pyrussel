@@ -14,13 +14,6 @@ class ProgramNode(ParseNode):
 
 
 @dataclass
-class BlockNode(ParseNode):
-    parameters: list[str] = field(default_factory=list)
-    statements: list[StatementNode] = field(default_factory=list)
-    expression: ExprNode = None
-
-
-@dataclass
 class StatementNode(ParseNode):
     pass
 
@@ -39,6 +32,13 @@ class PrintNode(StatementNode):
 @dataclass
 class ExprNode(ParseNode):
     pass
+
+
+@dataclass
+class BlockNode(ExprNode):
+    parameters: list[str] = field(default_factory=list)
+    statements: list[StatementNode] = field(default_factory=list)
+    expression: ExprNode = None
 
 
 @dataclass
