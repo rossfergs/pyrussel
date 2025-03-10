@@ -9,7 +9,7 @@ def skip_whitespace(input_string: str, idx: int) -> int:
     if idx >= len(input_string):
         return idx
 
-    if input_string[idx] == " ":
+    if input_string[idx] in [' ', '\n']:
         return skip_whitespace(input_string, idx+1)
 
     return idx
@@ -29,15 +29,48 @@ def collect(
     if char_check(input_string[idx]):
         return collect(input_string, idx+1, token_type, char_check, end_char, literal+input_string[idx])
 
+    print(f"{input_string[idx]=}")
+
     match token_type:
         case TokenType.NUMBER:
             LexerError("non-numeric character in number.")
         case TokenType.STRING:
             LexerError("non-numeric character in string.")
         case TokenType.NAMESPACE:
-            LexerError("invalid character in namespace symbol.")
+            LexerError("invalid character in namespace symbol." + literal)
         case _:
             LexerError("unexpected character in multi-character token.")
+
+
+def collect_operator(input_string: str, idx: int) -> tuple[Token, int]:
+    tok, idx = collect(
+        input_string,
+        idx,
+        TokenType.EQ,
+        lambda x: x in ['*', '+', '-', '/', '=', '<', '>', ':'],
+        lambda x: x not in ['*', '+', '-', '/', '=', '<', '>', ':'],
+        literal="")
+    match (tok.literal):
+        case "*":
+            return Token(TokenType.MULT, tok.literal), idx
+        case "+":
+            return Token(TokenType.ADD, tok.literal), idx
+        case "-":
+            return Token(TokenType.SUB, tok.literal), idx
+        case "=":
+            return Token(TokenType.EQ, tok.literal), idx
+        case "<":
+            return Token(TokenType.LESS, tok.literal), idx
+        case "<=":
+            return Token(TokenType.LEQ, tok.literal), idx
+        case ">":
+            return Token(TokenType.GREATER, tok.literal), idx
+        case ">=":
+            return Token(TokenType.GEQ, tok.literal), idx
+        case "::":
+            return Token(TokenType.CONS, tok.literal), idx
+        case _:
+            LexerError(f"Unknown operator '{tok.literal}'")
 
 
 def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
@@ -46,7 +79,7 @@ def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
         idx,
         TokenType.NAMESPACE,
         lambda x: x.isalnum() or x == '_',
-        lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*", "="])
+        lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*", "=", "\n"])
 
 
 def collect_string_literal(input_string: str, idx: int, end_quote: str) -> tuple[Token, int]:
@@ -64,7 +97,7 @@ def collect_number_token(input_string: str, idx: int) -> tuple[Token, int]:
         idx,
         TokenType.NUMBER,
         lambda x: '0' <= x <= '9' or x == '.',
-        lambda x: x in [" ", ")", ";", "+", "=", "*", "-"])
+        lambda x: x in [" ", ")", ";", "+", "=", "*", "-", "]", "\n"])
 
     if '.' in number.literal:
         return Token(TokenType.FLOAT, number.literal), current_idx
@@ -77,10 +110,28 @@ def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]
     match token_info.literal:
         case "let":
             return Token(TokenType.ASS, token_info.literal), token_idx
+        case "match":
+            return Token(TokenType.MATCH, token_info.literal), token_idx
+        case "case":
+            return Token(TokenType.CASE, token_info.literal), token_idx
+        case "with":
+            return Token(TokenType.WITH, token_info.literal), token_idx
+        case "when":
+            return Token(TokenType.WHEN, token_info.literal), token_idx
         case "print":
             return Token(TokenType.PRINT, token_info.literal), token_idx
+        case "println":
+            return Token(TokenType.PRINTLN, token_info.literal), token_idx
         case "in":
             return Token(TokenType.DELIM, token_info.literal), token_idx
+        case "if":
+            return Token(TokenType.IF, token_info.literal), token_idx
+        case "then":
+            return Token(TokenType.THEN, token_info.literal), token_idx
+        case "else":
+            return Token(TokenType.ELSE, token_info.literal), token_idx
+        case "true" | "false":
+            return Token(TokenType.BOOL, token_info.literal), token_idx
         case _:
             return token_info, token_idx
 
@@ -95,8 +146,14 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
             return collect_number_token(input_string, idx)
         case "'" | "\"":
             return collect_string_literal(input_string, idx+1, ch)
-        case ch if ch.isalnum():
+        case ch if ch.isalnum() or ch == '_':
             return collect_and_classify_token(input_string, idx)
+        case '*' | '+' | '-' | '/' | '=' | '>' | '<' | ':':
+            return collect_operator(input_string, idx)
+        case '[':
+            return Token(TokenType.OSQP, ch), idx+1
+        case ']':
+            return Token(TokenType.CSQP, ch), idx+1
         case '(':
             return Token(TokenType.OPAR, ch), idx+1
         case ')':

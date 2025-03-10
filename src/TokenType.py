@@ -3,6 +3,23 @@ from enum import Enum
 
 
 class TokenType(Enum):
+    WITH = enum.auto()
+    WHEN = enum.auto()
+    PRINTLN = enum.auto()
+    OSQP = enum.auto()
+    CSQP = enum.auto()
+    MATCH = enum.auto()
+    CASE = enum.auto()
+    CONS = enum.auto()
+    BOOL = enum.auto()
+    GEQ = enum.auto()
+    LEQ = enum.auto()
+    NEQ = enum.auto()
+    GREATER = enum.auto()
+    LESS = enum.auto()
+    IF = enum.auto()
+    THEN = enum.auto()
+    ELSE = enum.auto()
     OPAR = enum.auto()
     CPAR = enum.auto()
     ASS = enum.auto()

@@ -1,0 +1,9 @@
+let mm v = match v with
+  case x :: 2 :: xs then
+    println x;
+    println xs;
+    1
+  case _ then
+    "wildcard"
+
+println mm [1;2;3]

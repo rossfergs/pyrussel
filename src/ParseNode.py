@@ -30,8 +30,20 @@ class PrintNode(StatementNode):
 
 
 @dataclass
+class PrintLnNode(StatementNode):
+    expression: ExprNode = None
+
+
+@dataclass
 class ExprNode(ParseNode):
     pass
+
+
+@dataclass
+class IfNode(ExprNode):
+    condition: ExprNode
+    then_block: ExprNode
+    else_block: ExprNode
 
 
 @dataclass
@@ -48,6 +60,11 @@ class VariableNode(ExprNode):
 
 
 @dataclass
+class BoolNode(ExprNode):
+    value: bool = None
+
+
+@dataclass
 class IntegerNode(ExprNode):
     value: int = None
 
@@ -60,6 +77,42 @@ class FloatNode(ExprNode):
 @dataclass
 class StringNode(ExprNode):
     value: str = None
+
+
+@dataclass
+class EqNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class NeqNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class GeqNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class LeqNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class GreaterNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class LessNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
 
 
 @dataclass
@@ -84,3 +137,33 @@ class SubNode(ExprNode):
 class DivNode(ExprNode):
     left: ExprNode = None,
     right: ExprNode = None
+
+
+@dataclass
+class ListNode(ExprNode):
+    data: ExprNode = None,
+    next: ExprNode = None
+
+
+@dataclass
+class NilNode(ExprNode):
+    pass
+
+
+@dataclass
+class ConsNode(ExprNode):
+    left: ExprNode = None,
+    right: ExprNode = None
+
+
+@dataclass
+class MatchNode(ExprNode):
+    expr: ExprNode = None
+    cases: list[ExprNode] = field(default_factory=list)
+
+
+@dataclass
+class CaseNode(ExprNode):
+    pattern: ExprNode = None,
+    guard: ExprNode = None,
+    block: BlockNode = None
