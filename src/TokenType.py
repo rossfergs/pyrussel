@@ -3,6 +3,10 @@ from enum import Enum
 
 
 class TokenType(Enum):
+    DIV = enum.auto()
+    IMPORT = enum.auto()
+    LD = enum.auto()
+    TAG = enum.auto()
     WITH = enum.auto()
     WHEN = enum.auto()
     PRINTLN = enum.auto()

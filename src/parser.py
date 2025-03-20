@@ -13,7 +13,8 @@ from ParseNode import (
     ConsNode, BoolNode, GeqNode,
     GreaterNode, LeqNode, LessNode,
     EqNode, NeqNode, FloatNode,
-    MatchNode, CaseNode
+    MatchNode, CaseNode, TaggedNode,
+    ImportNode, NegativeNode
 )
 
 
@@ -177,7 +178,16 @@ def parse_println(input_string: str, idx: int) -> tuple[StatementNode, int]:
 
 
 def parse_statement(input_string: str, idx: int) -> tuple[StatementNode, int]:
+
     current_token, current_idx = lex(input_string, idx)
+
+    if current_token.type == TokenType.IMPORT:
+        file_path, path_idx = lex(input_string, current_idx)
+        if file_path.type != TokenType.STRING:
+            ParseError(
+                "file path must be given to import statement as a string")
+        return ImportNode(file_path.literal), path_idx+1
+
     if current_token.type == TokenType.PRINT:
         return parse_print(input_string, current_idx)
 
@@ -245,7 +255,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
             tok, tok_idx = lex(input_string, idx)
             if tok.type == TokenType.CSQP:
                 return (NilNode(), tok_idx)
-            expr, expr_idx = nud(tok, tok_idx)
+            expr, expr_idx = parse_expression(idx)
             next_token, next_idx = lex(input_string, expr_idx)
             match next_token.type:
                 case TokenType.CSQP:
@@ -254,7 +264,8 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                     remainder, end_idx = parse_list(next_idx)
                     return (ListNode(expr, remainder), end_idx)
                 case _:
-                    ParseError("unmatched in parsing list")
+                    ParseError(f"unmatched in parsing list {
+                               next_token.literal}")
 
         def collect_parameters(idx: int, params: list[ExprNode] = None) -> tuple[list[ExprNode], int]:
             if params is None:
@@ -263,7 +274,8 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
             next_token, next_idx = lex(input_string, idx)
 
             if (next_token.type not in
-               [TokenType.NAMESPACE,
+               [TokenType.TAG,
+                TokenType.NAMESPACE,
                 TokenType.STRING,
                 TokenType.FLOAT,
                 TokenType.OPAR,
@@ -283,6 +295,17 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
 
         def nud(t: Token, idx: int) -> tuple[ExprNode, int]:
             match t.type:
+                case TokenType.SUB:
+                    next_tok, next_idx = lex(input_string, idx)
+                    expr, expr_idx = nud(next_tok, next_idx)
+                    return NegativeNode(expr), expr_idx
+                case TokenType.LD:
+                    input_params, params_idx = parse_parameters(
+                        input_string, idx)
+                    return parse_block(input_string, params_idx, input_params)
+                case TokenType.TAG:
+                    expr, next_idx = parse_expression(idx)
+                    return TaggedNode(t.literal, expr), next_idx
                 case TokenType.MATCH:
                     return parse_match(input_string, idx)
                 case TokenType.IF:
@@ -307,6 +330,8 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                     paren_result, paren_idx = parse(0, idx)
                     next_token, next_idx = lex(input_string, paren_idx)
                     if next_token.type != TokenType.CPAR:
+                        print(paren_result)
+                        print(next_token)
                         ParseError("Unclosed parenthesis")
 
                     # if isinstance(paren_result, VariableNode):
@@ -324,6 +349,8 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                 lbp -= 1
             right_node, current_idx = parse(lbp, idx)
             match operator.type:
+                case TokenType.DIV:
+                    return DivNode(left_node, right_node), current_idx
                 case TokenType.CONS:
                     return ConsNode(left_node, right_node), current_idx
                 case TokenType.ADD:
@@ -353,7 +380,7 @@ def pp(input_string: str) -> Callable[[ParseNode, int], tuple[ExprNode, int]]:
                     return 5
                 case TokenType.ADD | TokenType.SUB | TokenType.CONS:
                     return 2
-                case TokenType.MULT:
+                case TokenType.MULT | TokenType.DIV:
                     return 3
                 case _:
                     return -1

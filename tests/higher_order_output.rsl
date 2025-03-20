@@ -1,8 +1,14 @@
 let factor f =
     let multiply n =
         f * n;
-    multiply;
+    multiply
 
-let double number = factor 2 number;
+println "DEFINING DOUBLE"
+let double = factor 2
+println "DEFINING TRIPLE"
+let triple = factor 3
 
-print double 10;
+println "CALLING DOUBLE"
+println double 10
+println "CALLING TRIPLE"
+println triple 10

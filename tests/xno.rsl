@@ -1,0 +1,7 @@
+let grid = [
+  [`None; `None; `None];
+  [`None; `None; `None];
+  [`None; `None; `None];
+]
+
+let place_piece board x y = 

@@ -1,4 +1,5 @@
 from typing import Callable
+import copy
 
 from parser import parse
 from error import Error, InterpreterError
@@ -10,9 +11,12 @@ from ParseNode import (
     ProgramNode, VariableNode, BlockNode,
     EqNode, NeqNode, GeqNode, LeqNode,
     LessNode, GreaterNode, IfNode, ListNode,
-    MatchNode, CaseNode
+    MatchNode, CaseNode, TaggedNode, ImportNode,
+    NegativeNode, DivNode
 )
 from Scope import Scope
+import sys
+sys.setrecursionlimit(5000)
 
 
 def get_from_scope(name: str, scope: Scope) -> ExprNode | BlockNode:
@@ -31,7 +35,9 @@ def match_list(pattern_list, expr_list, scope):
             return match_list(pat_rem, expr_rem, scope)
         case ListNode(data=VariableNode(namespace=name), next=pat_rem), ListNode(data=data, next=expr_rem):
             new_scope = scope
-            new_scope.current_scope[name] = interpret_expression(data, scope)
+            new_block = BlockNode(
+                statements=[], expression=interpret_expression(data, scope), parameters=[])
+            new_scope.current_scope[name] = new_block
             return match_list(pat_rem, expr_rem, new_scope)
         case ListNode(data=ListNode(), next=pat_rem), ListNode(data=ListNode(), next=expr_rem):
             match match_list(pattern_list.data, expr_list.data, scope):
@@ -39,9 +45,41 @@ def match_list(pattern_list, expr_list, scope):
                     return None
                 case new_scope:
                     return match_list(pat_rem, expr_rem, new_scope)
+        case ListNode(data=ConsNode(), next=pat_rem), ListNode(data=ListNode(), next=expr_rem):
+            match match_cons(expr_list.data, pattern_list.data.left, pattern_list.data.right, scope):
+                case None:
+                    return None
+                case new_scope:
+                    return match_list(pat_rem, expr_rem, new_scope)
         case ListNode(data=pat_data, next=pat_rem), ListNode(data=expr_data, next=expr_rem)\
                 if interpret_expression(pat_data, scope) == interpret_expression(expr_data, scope):
             return match_list(pat_rem, expr_rem, scope)
+        case _:
+            return None
+
+
+def match_tag(expr, pattern, scope) -> Scope | None:
+    match pattern, expr:
+        case TaggedNode(tag, VariableNode("_", _)), TaggedNode() if tag == expr.tag:
+            return scope
+        case TaggedNode(tag, VariableNode(namespace, _)), TaggedNode() if tag == expr.tag:
+            new_block = BlockNode(
+                statements=[], expression=interpret_expression(expr.expression, scope))
+            new_scope = scope
+            new_scope.current_scope[namespace] = new_block
+            return new_scope
+        case TaggedNode(pat_tag, TaggedNode()), TaggedNode(expr_tag, TaggedNode()) if tag == expr.tag:
+            return match_tag(expr.expression, pattern.expression, scope)
+        case TaggedNode(tag, NilNode()), TaggedNode(_, NilNode()) if tag == expr.tag:
+            return scope
+        case TaggedNode(tag, ListNode()), TaggedNode(_, ListNode()) if tag == expr.tag:
+            return match_list(pattern.expression, expr.expression, scope)
+        case TaggedNode(tag, ConsNode()), TaggedNode(_, ListNode()) if tag == expr.tag:
+            return match_cons(expr.expression, pattern.expression.left, pattern.expression.right, scope)
+        case TaggedNode(tag), TaggedNode()\
+            if tag == expr.tag\
+                and interpret_expression(pattern.expression, scope) == interpret_expression(expr.expression, scope):
+            return scope
         case _:
             return None
 
@@ -57,7 +95,7 @@ def match_cons(expr, left, right, scope: Scope) -> Scope | None:
                     new_scope.current_scope[name] = left_block
                     match right:
                         case ConsNode():
-                            return match_cons(rem, right.left, right.right, scope)
+                            return match_cons(rem, right.left, right.right, new_scope)
                         case VariableNode("_", _):
                             return scope
                         case VariableNode(name, _):
@@ -66,7 +104,7 @@ def match_cons(expr, left, right, scope: Scope) -> Scope | None:
                             new_scope.current_scope[name] = right_block
                             return new_scope
                         case ListNode() | NilNode():
-                            match match_list(right, rem):
+                            match match_list(right, rem, new_scope):
                                 case None:
                                     return None
                                 case new_scope:
@@ -75,6 +113,58 @@ def match_cons(expr, left, right, scope: Scope) -> Scope | None:
                             return None
                 case NilNode():
                     return None
+        case ListNode() | NilNode():
+            match expr:
+                case ListNode(data=ListNode(), next=rem) | ListNode(data=NilNode(), next=rem):
+                    match match_list(left, expr.data, scope):
+                        case None:
+                            return None
+                        case new_scope:
+                            match right:
+                                case ConsNode(l, r):
+                                    return match_cons(rem, l, r, scope)
+                                case VariableNode("_", _):
+                                    return scope
+                                case VariableNode(name, _):
+                                    new_block = BlockNode(
+                                        statements=[], expression=rem, parameters=[])
+                                    new_scope = scope
+                                    new_scope.current_scope[name] = new_block
+                                    return new_scope
+                                case ListNode() | NilNode():
+                                    match match_list(right, rem, scope):
+                                        case None:
+                                            return None
+                                        case new_scope:
+                                            return new_scope
+                                case _:
+                                    return None
+        case ConsNode():
+            match expr:
+                case ListNode(data=ListNode(), next=rem):
+                    match match_cons(expr.data, left.left, left.right, scope):
+                        case None:
+                            return None
+                        case new_scope:
+                            match right:
+                                case ConsNode(l, r):
+                                    return match_cons(rem, l, r, scope)
+                                case VariableNode("_", _):
+                                    return scope
+                                case VariableNode(name, _):
+                                    new_block = BlockNode(
+                                        statements=[], expression=rem, parameters=[])
+                                    new_scope = scope
+                                    new_scope.current_scope[name] = new_block
+                                    return new_scope
+                                case ListNode() | NilNode():
+                                    match match_list(right, rem, scope):
+                                        case None:
+                                            return None
+                                        case new_scope:
+                                            return new_scope
+                                case _:
+                                    return None
         case _:
             match expr:
                 case ListNode(data=cur, next=rem):
@@ -92,7 +182,7 @@ def match_cons(expr, left, right, scope: Scope) -> Scope | None:
                             new_scope.current_scope[name] = new_block
                             return new_scope
                         case ListNode() | NilNode():
-                            match match_list(right, rem):
+                            match match_list(right, rem, scope):
                                 case None:
                                     return None
                                 case new_scope:
@@ -124,7 +214,7 @@ def interpret_match(expr: ExprNode, case_list: list[ExprNode], scope: Scope) -> 
                     if not current_case.guard:
                         return interpret_block(current_case.block, new_scope)
                     else:
-                        if interpret_expression(current_case.guard, scope) == BoolNode(True):
+                        if interpret_expression(current_case.guard, new_scope) == BoolNode(True):
                             return interpret_block(current_case.block, new_scope)
                         else:
                             return interpret_match(expr, remaining_cases, scope)
@@ -136,7 +226,19 @@ def interpret_match(expr: ExprNode, case_list: list[ExprNode], scope: Scope) -> 
                     if not current_case.guard:
                         return interpret_block(current_case.block, new_scope)
                     else:
-                        if interpret_expression(current_case.guard, scope) == BoolNode(True):
+                        if interpret_expression(current_case.guard, new_scope) == BoolNode(True):
+                            return interpret_block(current_case.block, new_scope)
+                        else:
+                            return interpret_match(expr, remaining_cases, scope)
+        case TaggedNode():
+            match match_tag(expr, current_case.pattern, scope):
+                case None:
+                    return interpret_match(expr, remaining_cases, scope)
+                case new_scope:
+                    if not current_case.guard:
+                        return interpret_block(current_case.block, new_scope)
+                    else:
+                        if interpret_expression(current_case.guard, new_scope) == BoolNode(True):
                             return interpret_block(current_case.block, new_scope)
                         else:
                             return interpret_match(expr, remaining_cases, scope)
@@ -176,13 +278,14 @@ def interpret_match(expr: ExprNode, case_list: list[ExprNode], scope: Scope) -> 
 
 def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
 
+    def split_at_n(l, n) -> tuple[list, list]:
+        return l[:n], l[n:]
+
     def set_params(
-            f_name: str,
             taken: list[str],
             given: list[ExprNode],
             idx: int = 0,
             sd: dict[str, ExprNode | BlockNode] = None) -> dict[str, ExprNode | BlockNode]:
-
         if sd is None:
             sd = {}
 
@@ -190,38 +293,60 @@ def interpret_function(var: VariableNode, scope: Scope) -> ExprNode:
             return sd
 
         if idx >= len(taken) or idx >= len(given):
-            InterpreterError(f"function {f_name} takes in {
-                             len(taken)} parameters, but {len(given)} were taken")
+            InterpreterError(f"function takes in {len(taken)} parameters, but {
+                             len(given)} were taken")
+
+        if isinstance(given[idx], BlockNode):
+            sd[taken[idx]] = given[idx]
+            return set_params(taken, given, idx+1, sd)
 
         if not isinstance(given[idx], VariableNode):
             new_block = BlockNode()
             new_block.expression = interpret_expression(given[idx], scope)
             sd[taken[idx]] = new_block
-            return set_params(f_name, taken, given, idx+1, sd)
+            return set_params(taken, given, idx+1, sd)
 
         vgiven = get_from_scope(given[idx].namespace, scope)
         if not isinstance(vgiven, BlockNode):
             sd[taken[idx]] = vgiven
-            return set_params(f_name, taken, given, idx+1, sd)
+            return set_params(taken, given, idx+1, sd)
 
         if vgiven.parameters and not given[idx].parameters:
             sd[taken[idx]] = vgiven
-            return set_params(f_name, taken, given, idx+1, sd)
+            return set_params(taken, given, idx+1, sd)
 
         block = BlockNode()
         block.expression = interpret_expression(given[idx], scope)
         sd[taken[idx]] = block
 
-        return set_params(f_name, taken, given, idx+1, sd)
-
+        return set_params(taken, given, idx+1, sd)
     func = get_from_scope(var.namespace, scope)
+    current_params, remaining_params = split_at_n(
+        var.parameters, len(func.parameters))
+
     new_scope = Scope()
     new_scope.outer_scope = scope
+    sd = {}
+    if func.lexical_scope:
+        strings, exprs = func.lexical_scope
+        sd = set_params(strings, exprs, sd=sd)
+
     new_scope.current_scope = set_params(
-        var.namespace, func.parameters, var.parameters
+        func.parameters, current_params, sd=sd
     )
     result = interpret_block(func, new_scope)
-    return result
+    match remaining_params:
+        case []:
+            return result
+        case pl:
+            match result:
+                case BlockNode(parameters=p, lexical_scope=(s, e)):
+                    closure_scope = Scope(set_params(s, e), new_scope)
+                    closure_scope.current_scope = set_params(
+                        p, pl, sd=closure_scope.current_scope)
+                    return interpret_block(result, closure_scope)
+                case _:
+                    InterpreterError("too many params given")
 
 
 def get_type(n: ExprNode) -> str:
@@ -234,8 +359,22 @@ def get_type(n: ExprNode) -> str:
             return "Float"
         case _ if isinstance(n, BoolNode):
             return "Bool"
+        case _ if isinstance(n, ListNode) or isinstance(n, NilNode):
+            return "List"
+        case _ if isinstance(n, TaggedNode):
+            return n.tag + get_type(n.expression)
         case _:
             InterpreterError(f"Invalid Expression to get type from {n}")
+
+
+def are_lists_equal(left, right) -> bool:
+    match left, right:
+        case NilNode(), NilNode():
+            return True
+        case ListNode(data=ld, next=ln), ListNode(data=rd, next=rn) if ld == rd:
+            return are_lists_equal(ln, rn)
+        case _:
+            return False
 
 
 def interpret_predicate(node: ExprNode, scope: Scope) -> BoolNode:
@@ -243,9 +382,19 @@ def interpret_predicate(node: ExprNode, scope: Scope) -> BoolNode:
     right_node = interpret_expression(node.right, scope)
     match node:
         case EqNode():
-            return BoolNode(left_node.value == right_node.value)
+            if isinstance(left_node, ListNode) or isinstance(left_node, NilNode):
+                return BoolNode(are_lists_equal(left_node, right_node))
+            elif isinstance(right_node, ListNode) or isinstance(right_node, NilNode):
+                return BoolNode(are_lists_equal(left_node, right_node))
+            else:
+                return BoolNode(left_node.value == right_node.value)
         case NeqNode():
-            return BoolNode(left_node.value != right_node.value)
+            if isinstance(left_node, ListNode) or isinstance(left_node, NilNode):
+                return BoolNode(not are_lists_equal(left_node, right_node))
+            elif isinstance(right_node, ListNode) or isinstance(right_node, NilNode):
+                return BoolNode(not are_lists_equal(left_node, right_node))
+            else:
+                return BoolNode(left_node.value != right_node.value)
         case LeqNode():
             return BoolNode(left_node.value <= right_node.value)
         case GeqNode():
@@ -310,8 +459,46 @@ def interpret_expression(node: ExprNode, scope: Scope) -> ExprNode:
             case "Str":
                 return StringNode(operation(lv.value, rv.value))
 
+    def interpret_negative(node):
+        expr = interpret_expression(node.expression, scope)
+        match expr:
+            case IntegerNode(i):
+                return IntegerNode(-i)
+            case FloatNode(f):
+                return FloatNode(-f)
+            case _:
+                InterpreterError("only an integer or a float can be negative")
+
+    def interpret_div(left, right):
+        left_eval = interpret_expression(left, scope)
+        right_eval = interpret_expression(right, scope)
+        match left_eval, right_eval:
+            case IntegerNode(), IntegerNode():
+                return FloatNode(float(left_eval.value) / float(right_eval.value))
+            case FloatNode(), FloatNode():
+                return FloatNode(left_eval.value / right_eval.value)
+            case IntegerNode(), FloatNode() | FloatNode(), IntegerNode():
+                return FloatNode(float(left_eval.value) / float(right_eval.value))
+
+    def interpret_cast(to_type, node):
+        node_eval = interpret_expression(node, scope)
+        if not (isinstance(node_eval, IntegerNode) or isinstance(node_eval, FloatNode) or isinstance(node_eval, StringNode)):
+            InterpreterError(f"cannot cast value of {get_type(node_eval)}")
+        match to_type:
+            case 'int':
+                return IntegerNode(int(node_eval.value))
+            case 'float':
+                return FloatNode(float(node_eval.value))
+            case 'string':
+                return StringNode(str(node_eval.value))
+
+    if isinstance(node, VariableNode) and node.namespace in ['int', 'float', 'string'] and len(node.parameters) == 1:
+        new_scope = Scope(current_scope={}, outer_scope=scope)
+        return interpret_cast(node.namespace, node.parameters[0])
+
     if isinstance(node, VariableNode):
-        return interpret_function(node, scope)
+        new_scope = Scope(current_scope={}, outer_scope=scope)
+        return interpret_function(node, new_scope)
 
     if isinstance(node, IfNode):
         return interpret_if(node, scope)
@@ -319,15 +506,22 @@ def interpret_expression(node: ExprNode, scope: Scope) -> ExprNode:
     if isinstance(node, MatchNode):
         eval_expr = interpret_expression(node.expr, scope)
         new_scope = Scope()
+        # new_scope.outer_scope = copy.deepcopy(scope)
         new_scope.outer_scope = scope
         new_scope.current_scope = {}
         return interpret_match(eval_expr, node.cases, new_scope)
 
     match node:
+        case NegativeNode():
+            return interpret_negative(node)
+        case BlockNode():
+            return interpret_block(node, scope)
         case ListNode() | NilNode():
             return interpret_list(node)
         case ConsNode():
             return interpret_cons(node.left, node.right)
+        case DivNode():
+            return interpret_div(node.left, node.right)
         case AddNode():
             return apply_binary_operator(node.left, node.right, lambda x, y: x + y)
         case MultNode():
@@ -336,28 +530,40 @@ def interpret_expression(node: ExprNode, scope: Scope) -> ExprNode:
             return apply_binary_operator(node.left, node.right, lambda x, y: x - y)
         case EqNode() | NeqNode() | GeqNode() | LeqNode() | LessNode() | GreaterNode():
             return interpret_predicate(node, scope)
-        case IntegerNode() | StringNode() | FloatNode() | BoolNode():
+        case IntegerNode() | StringNode() | FloatNode() | BoolNode() | TaggedNode():
             return node
         case return_node:
             Error(f"Unknown expression type: {get_type(return_node)}")
 
 
-def interpret_block(node: BlockNode, scope: Scope, statement_idx: int = 0) -> tuple[ExprNode, Scope]:
+def interpret_block(node: BlockNode, scope: Scope, statement_idx: int = 0) -> ExprNode:
     if statement_idx >= len(node.statements):
-
-        if isinstance(node.expression, BlockNode) and node.parameters and node.expression.parameters:
-            return node.expression
-        return interpret_expression(node.expression, scope)
+        match node.expression:
+            case VariableNode() if node.expression.parameters == []:
+                block = get_from_scope(node.expression.namespace, scope)
+                match block:
+                    case BlockNode(parameters) if parameters != []:
+                        # block.lexical_scope = copy.deepcopy(list(
+                        #    zip(*[(k, v) for k, v in scope.current_scope.items()])))
+                        block.lexical_scope = (list(
+                            zip(*[(k, v) for k, v in scope.current_scope.items()])))
+                        return block
+                    case _:
+                        return interpret_block(block, scope)
+            case _:
+                return interpret_expression(node.expression, scope)
 
     scope = interpret_statement(node.statements[statement_idx], scope)
 
     return interpret_block(node, scope, statement_idx + 1)
 
 
+"""
 def interpret_assignment(node: LetNode, scope: Scope) -> Scope:
     new_block = interpret_block(node.expression, scope)
     scope.current_scope[node.namespace] = new_block
     return scope
+"""
 
 
 def interpret_if(node: IfNode, scope: Scope) -> Scope:
@@ -404,8 +610,30 @@ def interpret_print(node: PrintNode, scope: Scope) -> None:
 
 
 def interpret_statement(node: StatementNode, scope: Scope) -> Scope:
+    if isinstance(node, ImportNode):
+        with open(node.file_path, 'r') as import_file:
+            file_content = import_file.read()
+            return interpret(file_content)
+
     if isinstance(node, LetNode):
-        scope.current_scope[node.namespace] = node.block
+        if not node.block.parameters:
+            """
+            new_scope = Scope(current_scope={},
+                              outer_scope=copy.deepcopy(scope))
+            """
+            new_scope = Scope(current_scope={},
+                              outer_scope=(scope))
+            result = interpret_block(node.block, new_scope)
+            match result:
+                case BlockNode():
+                    scope.current_scope[node.namespace] = result
+                case _:
+                    new_block = BlockNode(
+                        statements=[], expression=result, parameters=[], lexical_scope=None)
+                    scope.current_scope[node.namespace] = new_block
+        else:
+            scope.current_scope[node.namespace] = node.block
+
         new_scope = scope
         return new_scope
 
@@ -431,13 +659,14 @@ def interpret_program(node: ProgramNode) -> None:
     def interpret_statements(statements: list[StatementNode], idx: int = 0, scope: Scope = Scope()) -> None:
 
         if idx >= len(statements):
-            return None
+            return scope
 
         current_scope = interpret_statement(statements[idx], scope)
 
-        return interpret_statements(statements, idx + 1, current_scope)
+        return interpret_statements(statements, idx + 1, (current_scope))
+        # return interpret_statements(statements, idx + 1, copy.deepcopy(current_scope))
 
-    interpret_statements(node.statements)
+    return interpret_statements(node.statements)
 
 
 def interpret(input_string: str) -> None:
@@ -445,4 +674,4 @@ def interpret(input_string: str) -> None:
     if not isinstance(tree, ProgramNode):
         Error("Start node must be of type ProgramNode")
 
-    interpret_program(tree)
+    return interpret_program(tree)

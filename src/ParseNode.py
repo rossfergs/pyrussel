@@ -50,7 +50,8 @@ class IfNode(ExprNode):
 class BlockNode(ExprNode):
     parameters: list[str] = field(default_factory=list)
     statements: list[StatementNode] = field(default_factory=list)
-    expression: ExprNode = None
+    expression: ExprNode = None,
+    lexical_scope: tuple[list] = None
 
 
 @dataclass
@@ -167,3 +168,19 @@ class CaseNode(ExprNode):
     pattern: ExprNode = None,
     guard: ExprNode = None,
     block: BlockNode = None
+
+
+@dataclass
+class TaggedNode(ExprNode):
+    tag: str = None
+    expression: ExprNode = None
+
+
+@dataclass
+class ImportNode(StatementNode):
+    file_path: str = None
+
+
+@dataclass
+class NegativeNode(ExprNode):
+    expression: ExprNode = None

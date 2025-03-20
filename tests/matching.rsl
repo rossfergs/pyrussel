@@ -1,9 +1,12 @@
 let mm v = match v with
-  case x :: 2 :: xs then
+  case 1 :: 2 :: [x] then
     println x;
-    println xs;
-    1
+    "matched!"
+  case `List x :: 2 :: xs then
+    print x;
+    print xs;
+    "tagges"
   case _ then
     "wildcard"
 
-println mm [1;2;3]
+println mm `List [1; 2;3]

@@ -1,5 +1,8 @@
-let rec n inc =
-    print n;
-    rec (n + inc) inc;
+let rec n =
+    if n <= 10
+    then
+      println n;
+      rec (n + 1)
+    else n
 
-rec 0 1
+print rec 0

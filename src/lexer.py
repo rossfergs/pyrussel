@@ -5,6 +5,15 @@ from TokenType import TokenType
 from error import LexerError
 
 
+def skip_comment(input_string: str, idx: int) -> int:
+    if idx >= len(input_string):
+        return idx
+    elif input_string[idx] == '@':
+        return idx+1
+    else:
+        return skip_comment(input_string, idx+1)
+
+
 def skip_whitespace(input_string: str, idx: int) -> int:
     if idx >= len(input_string):
         return idx
@@ -47,10 +56,12 @@ def collect_operator(input_string: str, idx: int) -> tuple[Token, int]:
         input_string,
         idx,
         TokenType.EQ,
-        lambda x: x in ['*', '+', '-', '/', '=', '<', '>', ':'],
-        lambda x: x not in ['*', '+', '-', '/', '=', '<', '>', ':'],
+        lambda x: x in ['!', '*', '+', '-', '/', '=', '<', '>', ':'],
+        lambda x: x not in ['!', '*', '+', '-', '/', '=', '<', '>', ':'],
         literal="")
     match (tok.literal):
+        case "/":
+            return Token(TokenType.DIV, tok.literal), idx
         case "*":
             return Token(TokenType.MULT, tok.literal), idx
         case "+":
@@ -59,6 +70,8 @@ def collect_operator(input_string: str, idx: int) -> tuple[Token, int]:
             return Token(TokenType.SUB, tok.literal), idx
         case "=":
             return Token(TokenType.EQ, tok.literal), idx
+        case "!=":
+            return Token(TokenType.NEQ, tok.literal), idx
         case "<":
             return Token(TokenType.LESS, tok.literal), idx
         case "<=":
@@ -78,7 +91,7 @@ def collect_namespace_token(input_string: str, idx: int) -> tuple[Token, int]:
         input_string,
         idx,
         TokenType.NAMESPACE,
-        lambda x: x.isalnum() or x == '_',
+        lambda x: x.isalnum() or x == '_' or x == '`',
         lambda x: x in [" ", ")", ";", "]", ".", "+", "-", "*", "=", "\n"])
 
 
@@ -108,6 +121,8 @@ def collect_number_token(input_string: str, idx: int) -> tuple[Token, int]:
 def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]:
     token_info, token_idx = collect_namespace_token(input_string, idx)
     match token_info.literal:
+        case lit if lit[0] == '`':
+            return Token(TokenType.TAG, token_info.literal), token_idx
         case "let":
             return Token(TokenType.ASS, token_info.literal), token_idx
         case "match":
@@ -116,8 +131,12 @@ def collect_and_classify_token(input_string: str, idx: int) -> tuple[Token, int]
             return Token(TokenType.CASE, token_info.literal), token_idx
         case "with":
             return Token(TokenType.WITH, token_info.literal), token_idx
+        case "ld":
+            return Token(TokenType.LD, token_info.literal), token_idx
         case "when":
             return Token(TokenType.WHEN, token_info.literal), token_idx
+        case "import":
+            return Token(TokenType.IMPORT, token_info.literal), token_idx
         case "print":
             return Token(TokenType.PRINT, token_info.literal), token_idx
         case "println":
@@ -146,9 +165,9 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
             return collect_number_token(input_string, idx)
         case "'" | "\"":
             return collect_string_literal(input_string, idx+1, ch)
-        case ch if ch.isalnum() or ch == '_':
+        case ch if ch.isalnum() or ch == '_' or ch == '`':
             return collect_and_classify_token(input_string, idx)
-        case '*' | '+' | '-' | '/' | '=' | '>' | '<' | ':':
+        case '*' | '+' | '-' | '/' | '=' | '>' | '<' | ':' | '!':
             return collect_operator(input_string, idx)
         case '[':
             return Token(TokenType.OSQP, ch), idx+1
@@ -170,5 +189,8 @@ def lex(input_string: str, idx: int) -> tuple[Token, int]:
             return Token(TokenType.EOF, ch), idx+1
         case '=':
             return Token(TokenType.EQ, ch), idx+1
+        case '@':
+            next_idx = skip_comment(input_string, idx+1)
+            return lex(input_string, next_idx)
         case _:
             LexerError(f"Unrecognised character: {ch}")
